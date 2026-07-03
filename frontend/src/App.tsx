@@ -1,0 +1,14 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+        {/* Rotas serão adicionadas nas próximas fases */}
+      </Routes>
+    </Router>
+  )
+}
+
+export default App
