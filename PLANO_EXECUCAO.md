@@ -28,33 +28,33 @@ InvitQR é uma plataforma web para digitalizar e gerir convites para eventos (ca
 #### 1.1 Setup Backend
 - [ ] Criar repositório git
 - [ ] Inicializar projeto Node.js + Express + TypeScript
-- [ ] Instalar dependências principais:
+- [x] Instalar dependências principais:
   - `express`, `cors`, `dotenv`
   - `prisma`, `@prisma/client`
   - `jsonwebtoken`, `bcrypt`
   - `qrcode`, `crypto`
   - `nodemailer`, `twilio`
   - `socket.io`
-  - `typescript`, `ts-node`, `tsx`
-- [ ] Configurar arquivo `.env` (variáveis de ambiente)
-- [ ] Criar estrutura de pastas (`/src/routes`, `/src/middleware`, `/src/services`, `/src/prisma`)
-- [ ] Configurar TypeScript (`tsconfig.json`)
+  - `typescript`, `ts-node`, `tsx` (como devDependencies)
+- [x] Configurar arquivo `.env` (variáveis de ambiente)
+- [x] Criar estrutura de pastas (`/src/routes`, `/src/middleware`, `/src/services`, `/src/prisma`)
+- [x] Configurar TypeScript (`tsconfig.json`)
 
 #### 1.2 Setup Frontend
 - [ ] Criar projeto React com Vite + TypeScript
-- [ ] Instalar dependências principais:
+- [x] Instalar dependências principais:
   - `react-router-dom`
   - `react-query`
   - `tailwindcss`, `postcss`, `autoprefixer`
   - `html5-qrcode` (leitura de QR)
   - `qrcode.react` (renderizar QR)
   - `axios` (requisições HTTP)
-- [ ] Configurar estrutura de pastas (`/src/pages`, `/src/components`, `/src/services`, `/src/types`)
+- [x] Configurar estrutura de pastas (`/src/pages`, `/src/components`, `/src/services`, `/src/types`)
 
 #### 1.3 Setup Database
 - [ ] Criar instância PostgreSQL (Railway ou Supabase)
-- [ ] Criar arquivo `schema.prisma` com tabelas base
-- [ ] Executar migrações iniciais
+- [x] Criar arquivo `schema.prisma` com tabelas base
+- [ ] Executar migrações iniciais (próximo passo)
 - [ ] Seed de dados de teste
 
 #### 1.4 Setup Infraestrutura
