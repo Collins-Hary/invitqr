@@ -28,9 +28,11 @@ app.get('/health', (_req, res) => {
 });
 import authRoutes from './routes/auth.js';
 import eventRoutes from './routes/events.js';
+import guestRoutes from './routes/guests.js';
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/events', guestRoutes);
 // app.use('/api/guests', guestRoutes)
 // app.use('/api/scanner', scannerRoutes)
 // Error Handler
