@@ -28,20 +28,21 @@ app.use(cors({
 app.use(express.json())
 
 // Health Check
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date() })
 })
 
 import authRoutes from './routes/auth.js'
+import eventRoutes from './routes/events.js'
 
 // Routes
 app.use('/api/auth', authRoutes)
-// app.use('/api/events', eventRoutes)
+app.use('/api/events', eventRoutes)
 // app.use('/api/guests', guestRoutes)
 // app.use('/api/scanner', scannerRoutes)
 
 // Error Handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err.stack)
   res.status(500).json({ error: 'Algo correu mal!', message: err.message })
 })

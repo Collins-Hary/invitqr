@@ -22,3 +22,35 @@ export async function login(payload: { email: string; password: string }) {
   })
   return res.data as AuthResponse
 }
+
+export interface EventPayload {
+  name: string
+  date: string
+  location: string
+  max_guests: number
+}
+
+export async function listEvents() {
+  const res = await api.get('/events')
+  return res.data
+}
+
+export async function createEvent(payload: EventPayload) {
+  const res = await api.post('/events', payload)
+  return res.data
+}
+
+export async function getEvent(eventId: string) {
+  const res = await api.get(`/events/${eventId}`)
+  return res.data
+}
+
+export async function updateEvent(eventId: string, payload: Partial<EventPayload>) {
+  const res = await api.patch(`/events/${eventId}`, payload)
+  return res.data
+}
+
+export async function deleteEvent(eventId: string) {
+  const res = await api.delete(`/events/${eventId}`)
+  return res.data
+}

@@ -53,7 +53,7 @@ router.get('/me', authMiddleware, async (req, res) => {
   res.json({ user })
 })
 
-router.post('/logout', authMiddleware, async (req, res) => {
+router.post('/logout', authMiddleware, async (_req, res) => {
   res.json({ success: true, message: 'Logout realizado com sucesso' })
 })
 
