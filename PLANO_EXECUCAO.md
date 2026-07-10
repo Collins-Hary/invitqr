@@ -29,6 +29,9 @@ InvitQR é uma plataforma web para digitalizar e gerir convites para eventos (ca
 - [ ] Criar repositório git
 - [ ] Inicializar projeto Node.js + Express + TypeScript
 - [x] Instalar dependências principais:
+`chmod +x node_modules/.bin/tsx`
+`npm install tsx@latest --save-dev`
+`npm run dev`
   - `express`, `cors`, `dotenv`
   - `prisma`, `@prisma/client`
   - `jsonwebtoken`, `bcrypt`
@@ -42,7 +45,10 @@ InvitQR é uma plataforma web para digitalizar e gerir convites para eventos (ca
 
 #### 1.2 Setup Frontend
 - [ ] Criar projeto React com Vite + TypeScript
-- [x] Instalar dependências principais:
+- [x] Instalar dependências principais:  
+ ` chmod +x node_modules/.bin/vite  `
+  `npm install qrcode.react@latest  `
+  `npm run dev`
   - `react-router-dom`
   - `react-query`
   - `tailwindcss`, `postcss`, `autoprefixer`
