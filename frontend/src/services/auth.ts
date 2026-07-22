@@ -75,3 +75,34 @@ export async function deleteGuest(eventId: string, guestId: string) {
   const res = await api.delete(`/events/${eventId}/guests/${guestId}`)
   return res.data
 }
+
+// Table management
+export interface TablePayload {
+  name: string
+  capacity: number
+}
+
+export async function listTables(eventId: string) {
+  const res = await api.get(`/events/${eventId}/tables`)
+  return res.data
+}
+
+export async function createTable(eventId: string, payload: TablePayload) {
+  const res = await api.post(`/events/${eventId}/tables`, payload)
+  return res.data
+}
+
+export async function updateTable(eventId: string, tableId: string, payload: Partial<TablePayload>) {
+  const res = await api.patch(`/events/${eventId}/tables/${tableId}`, payload)
+  return res.data
+}
+
+export async function deleteTable(eventId: string, tableId: string) {
+  const res = await api.delete(`/events/${eventId}/tables/${tableId}`)
+  return res.data
+}
+
+export async function assignGuestToTable(eventId: string, guestId: string, tableId: string | null) {
+  const res = await api.patch(`/events/${eventId}/guests/${guestId}/assign-table`, { table_id: tableId })
+  return res.data
+}
