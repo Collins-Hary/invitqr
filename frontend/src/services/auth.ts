@@ -40,8 +40,8 @@ export async function createEvent(payload: EventPayload) {
   return res.data
 }
 
-export async function getEvent(eventId: string) {
-  const res = await api.get(`/events/${eventId}`)
+export async function getEvent(eventId: string, config?: any) {
+  const res = await api.get(`/events/${eventId}`, config)
   return res.data
 }
 
@@ -104,5 +104,22 @@ export async function deleteTable(eventId: string, tableId: string) {
 
 export async function assignGuestToTable(eventId: string, guestId: string, tableId: string | null) {
   const res = await api.patch(`/events/${eventId}/guests/${guestId}/assign-table`, { table_id: tableId })
+  return res.data
+}
+
+// ─── Invite (Email) ──────────────────────────────────────────────────────────
+
+export async function sendInvite(eventId: string, guestId: string) {
+  const res = await api.post(`/events/${eventId}/guests/${guestId}/send-invite`)
+  return res.data
+}
+
+export async function sendAllInvites(eventId: string) {
+  const res = await api.post(`/events/${eventId}/send-all-invites`)
+  return res.data
+}
+
+export async function getGuest(eventId: string, guestId: string) {
+  const res = await api.get(`/events/${eventId}/guests/${guestId}`)
   return res.data
 }

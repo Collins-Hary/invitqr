@@ -3,7 +3,8 @@ import { useAuth } from '../../hooks/useAuth'
 import {
   createEvent, listEvents, deleteEvent,
   listGuests, createGuest, deleteGuest,
-  listTables, createTable, updateTable, deleteTable, assignGuestToTable
+  listTables, createTable, updateTable, deleteTable, assignGuestToTable,
+  sendInvite, sendAllInvites, getEvent
 } from '../../services/auth'
 
 export default function Dashboard() {
@@ -20,6 +21,8 @@ export default function Dashboard() {
   const [editTableId, setEditTableId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingGuestId, setExportingGuestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const loadEvents = async () => {
@@ -123,6 +126,95 @@ export default function Dashboard() {
     }
   }
 
+  const [sendingGuestId, setSendingGuestId] = useState<string | null>(null)
+  const [sendingAll, setSendingAll] = useState(false)
+
+  const handleSendInvite = async (guestId: string) => {
+    setSendingGuestId(guestId)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await sendInvite(selectedEventId, guestId)
+      if (result.success) {
+        setSuccess('Convite enviado com sucesso!')
+        await loadGuests(selectedEventId)
+      } else {
+        setError(result.error || 'Falha ao enviar convite')
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Falha ao enviar convite')
+    } finally {
+      setSendingGuestId(null)
+      setTimeout(() => setSuccess(null), 3000)
+    }
+  }
+
+  const handleSendAllInvites = async () => {
+    if (!confirm(`Enviar convites para todos os ${guests.length} convidados com email?`)) return
+
+    setSendingAll(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const result = await sendAllInvites(selectedEventId)
+      const msg = `Convites enviados: ${result.sent} enviados, ${result.failed} falhas (de ${result.total})`
+      if (result.failed > 0) {
+        setError(msg)
+      } else {
+        setSuccess(msg)
+      }
+      await loadGuests(selectedEventId)
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Falha ao enviar convites em massa')
+    } finally {
+      setSendingAll(false)
+      setTimeout(() => setSuccess(null), 5000)
+    }
+  }
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true)
+    setError(null)
+    try {
+      // We use getEvent which is a function that calls the API directly with axios
+      // This allows us to get the raw data as a blob
+      const response = await getEvent(`${selectedEventId}/guests/export/pdf`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `convites-${selectedEvent?.name.replace(/\s/g, '_')}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Falha ao exportar PDF')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  const handleExportIndividualPdf = async (guest: any) => {
+    setExportingGuestId(guest.id)
+    setError(null)
+    try {
+      const response = await getEvent(`${selectedEventId}/guests/${guest.id}/export/pdf`, { responseType: 'blob' })
+      const url = window.URL.createObjectURL(new Blob([response]))
+      const link = document.createElement('a')
+      link.href = url
+      const eventName = selectedEvent?.name.replace(/\s/g, '_') || 'evento'
+      const guestName = guest.name.replace(/\s/g, '_')
+      link.setAttribute('download', `convite-${guestName}-${eventName}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+    } catch (err: any) {
+      setError(err?.response?.data?.error || 'Falha ao exportar PDF do convidado')
+    } finally {
+      setExportingGuestId(null)
+    }
+  }
   // ---- Tables ----
   const loadTables = async (eventId: string) => {
     try {
@@ -231,7 +323,7 @@ export default function Dashboard() {
         {/* Alerts */}
         {error && (
           <div className="mb-6 rounded-lg border border-rose-400/40 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-            ⚠️ {error}
+             {error}
           </div>
         )}
         {success && (
@@ -272,7 +364,7 @@ export default function Dashboard() {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            📅 Eventos ({events.length})
+             Eventos ({events.length})
           </button>
           <button
             onClick={() => setActiveTab('guests')}
@@ -292,7 +384,7 @@ export default function Dashboard() {
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            🪑 Mesas ({tables.length})
+             Mesas ({tables.length})
           </button>
         </div>
 
@@ -316,10 +408,10 @@ export default function Dashboard() {
                         <div className="flex-1">
                           <h3 className="font-semibold text-white">{event.name}</h3>
                           <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-slate-400">
-                            <p>📍 {event.location}</p>
-                            <p>👥 {event.max_guests} convidados</p>
-                            <p>📅 {formatDate(event.date)}</p>
-                            <p>🔐 PIN: <span className="text-cyan-300 font-mono">{event.scanner_pin}</span></p>
+                            <p> {event.location}</p>
+                            <p> {event.max_guests} convidados</p>
+                            <p> {formatDate(event.date)}</p>
+                            <p> PIN: <span className="text-cyan-300 font-mono">{event.scanner_pin}</span></p>
                           </div>
                         </div>
                         <div className="ml-4 flex flex-col gap-2">
@@ -437,12 +529,28 @@ export default function Dashboard() {
                           <h2 className="text-xl font-semibold">Convidados</h2>
                           <p className="mt-1 text-sm text-slate-400">{selectedEvent?.name}</p>
                         </div>
-                        <button
-                          onClick={() => setSelectedEventId('')}
-                          className="text-xs text-slate-400 hover:text-slate-200"
-                        >
-                          ✕ Mudar evento
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSendAllInvites}
+                            disabled={sendingAll || guests.length === 0}
+                            className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-40"
+                          >
+                            {sendingAll ? 'A enviar...' : '📨 Enviar Todos'}
+                          </button>
+                          <button
+                            onClick={handleExportPdf}
+                            disabled={exportingPdf || guests.length === 0}
+                            className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-40"
+                          >
+                            {exportingPdf ? 'A exportar...' : '📄 Exportar PDF'}
+                          </button>
+                          <button
+                            onClick={() => setSelectedEventId('')}
+                            className="text-xs text-slate-400 hover:text-slate-200"
+                          >
+                            ✕ Mudar evento
+                          </button>
+                        </div>
                       </div>
                     </div>
                     <div className="divide-y divide-white/10">
@@ -457,20 +565,56 @@ export default function Dashboard() {
                               <div className="flex-1">
                                 <h3 className="font-semibold text-white">{guest.name}</h3>
                                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
-                                  {guest.email && <p>📧 {guest.email}</p>}
-                                  {guest.phone && <p>📱 {guest.phone}</p>}
+                                  {guest.email && <p> {guest.email}</p>}
+                                  {guest.phone && <p>{guest.phone}</p>}
                                   <p className="col-span-2">🔐 <span className="text-cyan-300 font-mono">Código: {guest.backup_code}</span></p>
                                 </div>
                               </div>
-                              <button
-                                onClick={() => handleGuestDelete(guest.id)}
-                                className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-200 transition hover:bg-rose-500/20"
-                              >
-                                Eliminar
-                              </button>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleSendInvite(guest.id)}
+                                  disabled={sendingGuestId === guest.id || !guest.email}
+                                  className={`rounded-lg px-3 py-1 text-xs font-medium transition disabled:opacity-40 ${
+                                    guest.invite_sent
+                                      ? 'border border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+                                      : 'border border-cyan-400/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20'
+                                  }`}
+                                  title={!guest.email ? 'Convidado sem email' : ''}
+                                >
+                                  {sendingGuestId === guest.id ? (
+                                    <span className="inline-flex items-center gap-1">A enviar...</span>
+                                  ) : guest.invite_sent ? (
+                                    <span className="inline-flex items-center gap-1">✓ Enviado</span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1">📧 Enviar</span>
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleExportIndividualPdf(guest)}
+                                  disabled={exportingGuestId === guest.id}
+                                  className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-40"
+                                  title="Exportar convite em PDF"
+                                >
+                                  {exportingGuestId === guest.id
+                                    ? '...'
+                                    : '📄'
+                                  }
+                                </button>
+                                <button
+                                  onClick={() => handleGuestDelete(guest.id)}
+                                  className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-200 transition hover:bg-rose-500/20"
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
                             </div>
-                            <div className="pt-3 border-t border-white/10">
-                              <p className="text-xs text-slate-400">RSVP: <span className={guest.rsvp_status === 'confirmed' ? 'text-emerald-300' : guest.rsvp_status === 'declined' ? 'text-rose-300' : 'text-slate-300'}>{guest.rsvp_status}</span></p>
+                            <div className="flex gap-4 pt-3 border-t border-white/10">
+                              <p className="text-xs text-slate-400">
+                                RSVP: <span className={guest.rsvp_status === 'confirmed' ? 'text-emerald-300' : guest.rsvp_status === 'declined' ? 'text-rose-300' : 'text-slate-300'}>{guest.rsvp_status}</span>
+                              </p>
+                              {guest.invite_sent && (
+                                <p className="text-xs text-emerald-400">Convite enviado ✓</p>
+                              )}
                             </div>
                           </div>
                         ))
@@ -510,7 +654,7 @@ export default function Dashboard() {
                         className="mt-1 block w-full rounded-lg border border-white/10 bg-slate-900/70 px-3 py-2 text-sm focus:border-cyan-400 focus:outline-none"
                         value={guestForm.phone}
                         onChange={(e) => setGuestForm({ ...guestForm, phone: e.target.value })}
-                        placeholder="+351 912 345 678"
+                        placeholder= "+244 912 345 678"
                       />
                     </label>
                     <button
@@ -523,7 +667,7 @@ export default function Dashboard() {
                   </form>
                   <div className="mt-6 p-3 bg-slate-800/50 rounded-lg border border-white/5">
                     <p className="text-xs text-slate-400">
-                      <strong>💡 Dica:</strong> Cada convidado recebe um código de backup único para validação na entrada.
+                      <strong> Dica:</strong> Cada convidado recebe um código de backup único para validação na entrada.
                     </p>
                   </div>
                 </div>
