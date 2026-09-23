@@ -25,6 +25,6 @@
     "sourceMap": true,
     "outDir": "./dist"
   },
-  "include": ["src", "../frontend/src/pages/scanner/ScannerPage.tsx"],
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }
