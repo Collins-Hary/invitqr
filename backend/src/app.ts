@@ -60,8 +60,10 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   res.status(500).json({ error: 'Algo correu mal!', message: err.message })
 })
 
-httpServer.listen(PORT, () => {
-  console.log(`InvitQR Backend rodando em http://localhost:${PORT}`)
-})
+if (!process.env.VERCEL) {
+  httpServer.listen(PORT, () => {
+    console.log(`InvitQR Backend rodando em http://localhost:${PORT}`)
+  })
+}
 
 export default app
