@@ -49,8 +49,10 @@ app.use((err, _req, res, _next) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Algo correu mal!', message: err.message });
 });
-httpServer.listen(PORT, () => {
-    console.log(`🚀 InvitQR Backend rodando em http://localhost:${PORT}`);
-});
+if (!process.env.VERCEL) {
+    httpServer.listen(PORT, () => {
+        console.log(`InvitQR Backend rodando em http://localhost:${PORT}`);
+    });
+}
 export default app;
 //# sourceMappingURL=app.js.map
