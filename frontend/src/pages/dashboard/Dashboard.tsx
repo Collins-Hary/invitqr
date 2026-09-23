@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { useAuth } from '../../hooks/useAuth'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth.tsx'
+import DashboardLayout from '../../components/dashboard/DashboardLayout'
+import StatsCards from '../../components/dashboard/StatsCards'
+import RecentInvites from '../../components/dashboard/RecentInvites'
+import UpcomingEvents from '../../components/dashboard/UpcomingEvents'
+import QuickActions from '../../components/dashboard/QuickActions'
 import {
   createEvent, listEvents, deleteEvent,
   listGuests, createGuest, deleteGuest,
@@ -9,6 +15,8 @@ import {
 
 export default function Dashboard() {
   const auth = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<'events' | 'guests' | 'tables'>('events')
   const [events, setEvents] = useState<any[]>([])
   const [selectedEventId, setSelectedEventId] = useState<string>('')
@@ -21,9 +29,19 @@ export default function Dashboard() {
   const [editTableId, setEditTableId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [lastCreatedPin, setLastCreatedPin] = useState<string | null>(null)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [exportingGuestId, setExportingGuestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [compactMode, setCompactMode] = useState(false)
+  const [scannerAlerts, setScannerAlerts] = useState(true)
+
+  const dashboardRoute = location.pathname
+  const isStatsView = dashboardRoute === '/stats'
+  const isSettingsView = dashboardRoute === '/settings'
+  const isCreateView = dashboardRoute === '/events/new'
 
   const loadEvents = async () => {
     try {
@@ -38,8 +56,38 @@ export default function Dashboard() {
     loadEvents()
   }, [])
 
+  useEffect(() => {
+    const path = location.pathname
+    if (path === '/guests') setActiveTab('guests')
+    else if (path === '/events/new') setActiveTab('events')
+    else if (path === '/events' || path === '/my-invites' || path === '/dashboard') setActiveTab('events')
+    else if (path === '/stats') setActiveTab('events')
+    else if (path === '/settings') setActiveTab('events')
+
+    if (path === '/events/new') {
+      window.requestAnimationFrame(() => {
+        document.getElementById('create-event-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    }
+  }, [location.pathname])
+
   const handleLogout = () => {
     auth.logout()
+  }
+
+  const handleShareEvent = async (event: any) => {
+    const shareUrl = `${window.location.origin}/invite/${event?.qr_token || event?.id}`
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+        setSuccess('Link do convite copiado para a área de transferência!')
+      } else {
+        window.open(shareUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch {
+      window.open(shareUrl, '_blank', 'noopener,noreferrer')
+    }
   }
 
   const handleEventSubmit = async (e: React.FormEvent) => {
@@ -49,16 +97,16 @@ export default function Dashboard() {
     setLoading(true)
 
     try {
-      await createEvent({
+      const newEvent = await createEvent({
         name: eventForm.name,
         date: eventForm.date,
         location: eventForm.location,
         max_guests: Number(eventForm.max_guests)
       })
       setEventForm({ name: '', date: '', location: '', max_guests: '100' })
-      setSuccess('Evento criado com sucesso!')
+      setSuccess('Evento criado! Anote o PIN do Scanner, ele não será mostrado novamente.')
+      setLastCreatedPin(newEvent.scanner_pin) // Guardar o PIN para exibir no modal
       await loadEvents()
-      setTimeout(() => setSuccess(null), 3000)
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Não foi possível criar o evento')
     } finally {
@@ -70,7 +118,13 @@ export default function Dashboard() {
     if (!confirm('Tem a certeza que deseja eliminar este evento?')) return
     try {
       await deleteEvent(eventId)
-      await loadEvents()
+      setEvents(prevEvents => prevEvents.filter(event => event.id !== eventId))
+      if (selectedEventId === eventId) {
+        setSelectedEventId('')
+        setSelectedEvent(null)
+        setGuests([])
+        setTables([])
+      }
       setSuccess('Evento eliminado com sucesso!')
       setTimeout(() => setSuccess(null), 3000)
     } catch (err: any) {
@@ -303,20 +357,29 @@ export default function Dashboard() {
     minute: '2-digit'
   })
 
+  const visibleEvents = events.filter((event) => {
+    const query = searchTerm.trim().toLocaleLowerCase()
+    if (!query) return true
+    return [event.name, event.location].some((value) => String(value || '').toLocaleLowerCase().includes(query))
+  })
+
+  const showEventsWorkspace = !isStatsView && !isSettingsView
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6 lg:p-10 text-slate-100">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <DashboardLayout title="Dashboard" searchTerm={searchTerm} onSearch={setSearchTerm}>
+      <div className="mx-auto max-w-[1480px] text-slate-100">
+        <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div>
-            <h1 className="text-4xl font-bold">InvitQR</h1>
-            <p className="mt-1 text-sm text-slate-400">Bem-vindo, {auth.user?.name || 'utilizador'}!</p>
+            <p className="dashboard-label text-cyan-300/80">{isStatsView ? 'Análise' : isSettingsView ? 'Conta' : 'Painel de controlo'}</p>
+            <h1 className="mt-2 max-w-2xl text-3xl font-semibold tracking-tight text-white sm:text-4xl">{isStatsView ? 'Entenda o desempenho dos seus convites.' : isSettingsView ? 'Defina como quer usar o InvitQR.' : isCreateView ? 'Crie um novo evento.' : 'Tudo o que importa para o seu próximo evento.'}</h1>
+            <p className="mt-3 text-sm text-slate-400">Olá, {auth.user?.name || 'utilizador'}. {isStatsView ? 'Consulte os números agregados da sua operação.' : isSettingsView ? 'As preferências da sua conta ficam organizadas aqui.' : 'Acompanhe convites, confirmações e chegadas num só lugar.'}</p>
           </div>
           <button
+            type="button"
             onClick={handleLogout}
-            className="self-start rounded-full border border-rose-400/30 bg-rose-500/10 px-6 py-2 font-semibold text-rose-200 transition hover:bg-rose-500/20 sm:self-auto"
+            className="self-start rounded-xl border border-white/[0.08] px-4 py-2 text-xs font-semibold text-slate-400 transition hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-rose-200 lg:self-auto"
           >
-            Logout
+            Terminar sessão
           </button>
         </div>
 
@@ -328,37 +391,154 @@ export default function Dashboard() {
         )}
         {success && (
           <div className="mb-6 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-            ✓ {success}
+            <p>✓ {success}</p>
+            {lastCreatedPin && (
+              <p className="mt-2 font-bold">PIN do Scanner: <span className="font-mono text-lg text-cyan-300">{lastCreatedPin}</span></p>
+            )}
+            <button type="button" onClick={() => { setSuccess(null); setLastCreatedPin(null); }} className="mt-2 text-xs font-bold hover:text-white">Fechar</button>
           </div>
         )}
 
-        {/* Stats Cards */}
-        <div className="mb-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-400">Total de Eventos</p>
-            <p className="mt-2 text-3xl font-bold text-cyan-300">{events.length}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-400">Total de Convidados</p>
-            <p className="mt-2 text-3xl font-bold text-cyan-300">{guests.length}</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-400">Próximo Evento</p>
-            <p className="mt-2 text-sm font-semibold text-slate-200">
-              {events.length > 0 ? new Date(events[0].date).toLocaleDateString('pt-PT') : 'Nenhum'}
-            </p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-            <p className="text-sm text-slate-400">Status</p>
-            <p className="mt-2 text-sm font-semibold text-emerald-300">Ativo</p>
-          </div>
-        </div>
+        {!isSettingsView && <div className="mb-8">
+          <StatsCards events={events} views={events.reduce((s, e) => s + (e.views || 0), 0)} confirmations={events.reduce((s, e) => s + (e.confirmations || 0), 0)} />
+        </div>}
 
-        {/* Tabs */}
-        <div className="mb-8 flex gap-4 border-b border-white/10">
+        {isStatsView && (
+          <section className="mb-10 space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              {[
+                ['Taxa de confirmação', `${events.length ? Math.round(events.reduce((sum, event) => sum + (event.confirmations || 0), 0) / Math.max(events.reduce((sum, event) => sum + (event.guestCount || 0), 0), 1) * 100) : 0}%`, 'convites com resposta'],
+                ['Média por evento', `${events.length ? Math.round(events.reduce((sum, event) => sum + (event.guestCount || 0), 0) / events.length) : 0}`, 'convidados convidados'],
+                ['Próximo marco', events.length ? `${Math.max(0, Math.ceil((new Date(events[0].date).getTime() - Date.now()) / 86400000))} dias` : '—', 'até ao próximo evento'],
+              ].map(([label, value, detail]) => (
+                <div key={label} className="dashboard-panel rounded-2xl p-5">
+                  <p className="dashboard-label">{label}</p>
+                  <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
+                  <p className="mt-1 text-xs text-slate-500">{detail}</p>
+                </div>
+              ))}
+            </div>
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="dashboard-panel rounded-2xl p-6">
+                <div className="flex items-end justify-between">
+                  <div><p className="dashboard-label">Desempenho</p><h2 className="mt-1 text-xl font-semibold text-white">Ritmo dos seus eventos</h2></div>
+                  <span className="text-xs text-slate-500">{events.length} eventos analisados</span>
+                </div>
+                <div className="mt-8 space-y-5">
+                  {events.slice(0, 5).map((event) => {
+                    const guestsCount = event.guestCount || 0
+                    const confirmed = event.confirmations || 0
+                    const progress = guestsCount ? Math.min(100, Math.round((confirmed / guestsCount) * 100)) : 0
+                    return (
+                      <div key={event.id}>
+                        <div className="mb-2 flex justify-between text-sm"><span className="text-slate-200">{event.name}</span><span className="text-cyan-300">{progress}%</span></div>
+                        <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all" style={{ width: `${progress}%` }} /></div>
+                        <p className="mt-1 text-xs text-slate-600">{confirmed} confirmações de {guestsCount} convidados</p>
+                      </div>
+                    )
+                  })}
+                  {!events.length && <p className="rounded-xl border border-dashed border-white/10 p-6 text-sm text-slate-500">Crie o primeiro evento para começar a acompanhar o desempenho.</p>}
+                </div>
+              </div>
+              <div className="dashboard-panel rounded-2xl p-6">
+                <p className="dashboard-label">Resumo da operação</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Onde está a atenção</h2>
+                <div className="mt-6 space-y-3">
+                  <div className="flex items-center justify-between rounded-xl bg-amber-400/[0.06] p-4"><span className="text-sm text-slate-300">Convites pendentes</span><strong className="text-amber-300">{Math.max(0, events.reduce((sum, event) => sum + (event.guestCount || 0) - (event.confirmations || 0), 0))}</strong></div>
+                  <div className="flex items-center justify-between rounded-xl bg-cyan-400/[0.06] p-4"><span className="text-sm text-slate-300">Eventos na agenda</span><strong className="text-cyan-300">{events.length}</strong></div>
+                  <div className="flex items-center justify-between rounded-xl bg-emerald-400/[0.06] p-4"><span className="text-sm text-slate-300">Confirmações recebidas</span><strong className="text-emerald-300">{events.reduce((sum, event) => sum + (event.confirmations || 0), 0)}</strong></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {isSettingsView && (
+          <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-6">
+              <div className="dashboard-panel rounded-2xl p-6">
+                <p className="dashboard-label">Perfil</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">A sua identidade InvitQR</h2>
+                <div className="mt-6 flex items-center gap-4 rounded-2xl bg-white/[0.035] p-4">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-300 to-violet-400 text-xl font-bold text-slate-950">{(auth.user?.name || 'U')[0]}</div>
+                  <div><p className="font-semibold text-white">{auth.user?.name || 'Utilizador'}</p><p className="text-sm text-slate-500">{auth.user?.email || 'Email não informado'}</p></div>
+                  <span className="ml-auto rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-300">Conta ativa</span>
+                </div>
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-xl border border-white/[0.07] p-4"><p className="text-xs text-slate-500">Eventos criados</p><p className="mt-2 text-2xl font-semibold text-white">{events.length}</p></div>
+                  <div className="rounded-xl border border-white/[0.07] p-4"><p className="text-xs text-slate-500">Membro desde</p><p className="mt-2 text-sm font-semibold text-white">{auth.user?.created_at ? new Date(auth.user.created_at).toLocaleDateString('pt-PT') : 'Este ano'}</p></div>
+                </div>
+              </div>
+              <div className="dashboard-panel rounded-2xl p-6">
+                <p className="dashboard-label">Preferências</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Como quer receber informação</h2>
+                <div className="mt-5 divide-y divide-white/[0.07]">
+                  {[
+                    ['Notificações por email', 'Receba alertas sobre confirmações e convites.', emailNotifications, setEmailNotifications],
+                    ['Alertas do scanner', 'Avise-me quando houver uma entrada validada.', scannerAlerts, setScannerAlerts],
+                    ['Modo compacto', 'Mostre mais informação com menos espaço.', compactMode, setCompactMode],
+                  ].map(([label, detail, enabled, setter]) => (
+                    <button type="button" key={label as string} onClick={() => (setter as (value: boolean) => void)(!(enabled as boolean))} className="flex w-full items-center justify-between py-4 text-left">
+                      <span><span className="block text-sm font-medium text-white">{label as string}</span><span className="mt-1 block text-xs text-slate-500">{detail as string}</span></span>
+                      <span className={`relative h-6 w-11 rounded-full transition ${enabled ? 'bg-cyan-400' : 'bg-white/10'}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${enabled ? 'left-6' : 'left-1'}`} /></span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="space-y-6">
+              <div className="dashboard-panel rounded-2xl p-6">
+                <p className="dashboard-label">Segurança</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Acesso e privacidade</h2>
+                <div className="mt-5 space-y-3">
+                  <div className="flex items-center gap-3 rounded-xl bg-emerald-400/[0.06] p-4"><span className="text-xl text-emerald-300">✓</span><div><p className="text-sm font-medium text-white">Sessão protegida</p><p className="text-xs text-slate-500">Autenticação ativa neste dispositivo.</p></div></div>
+                  <div className="flex items-center gap-3 rounded-xl bg-cyan-400/[0.06] p-4"><span className="text-xl text-cyan-300">⌁</span><div><p className="text-sm font-medium text-white">Scanner separado</p><p className="text-xs text-slate-500">O segurança usa o PIN do evento, sem acesso à sua conta.</p></div></div>
+                </div>
+              </div>
+              <div className="dashboard-panel rounded-2xl border-rose-400/10 p-6">
+                <p className="dashboard-label text-rose-300/70">Sessão</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Sair deste dispositivo</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-500">Encerra o acesso atual e remove as credenciais guardadas neste navegador.</p>
+                <button type="button" onClick={handleLogout} className="mt-5 w-full rounded-xl border border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200 transition hover:bg-rose-500/20">Terminar sessão</button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {showEventsWorkspace && <div className="mb-10 grid gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.75fr)]">
+          <section className="dashboard-panel rounded-2xl p-5 sm:p-6">
+            <div className="mb-5 flex items-end justify-between">
+              <div>
+                <p className="dashboard-label">Atividade recente</p>
+                <h2 className="mt-1 text-xl font-semibold text-white">Convites recentes</h2>
+              </div>
+              <span className="text-xs text-slate-500">{events.length} no total</span>
+            </div>
+            <RecentInvites events={events} onShare={handleShareEvent} />
+          </section>
+          <div className="space-y-6">
+            <QuickActions onCreated={(event) => {
+              if (event) {
+                setLastCreatedPin(event.scanner_pin || null)
+                setSuccess('Evento criado! Anote o PIN do Scanner, ele não será mostrado novamente.')
+              }
+              loadEvents()
+            }} />
+            <section className="dashboard-panel rounded-2xl p-5">
+              <div className="mb-4">
+                <p className="dashboard-label">Agenda</p>
+                <h2 className="mt-1 text-lg font-semibold text-white">Próximos eventos</h2>
+              </div>
+              <UpcomingEvents events={visibleEvents} />
+            </section>
+          </div>
+        </div>}
+
+        {showEventsWorkspace && <div className="mb-6 flex flex-wrap items-center gap-1 border-b border-white/[0.08]">
           <button
+            type="button"
             onClick={() => setActiveTab('events')}
-            className={`px-4 py-3 font-medium transition ${
+            className={`rounded-t-xl px-4 py-3 text-sm font-medium transition ${
               activeTab === 'events'
                 ? 'border-b-2 border-cyan-400 text-cyan-400'
                 : 'text-slate-400 hover:text-slate-200'
@@ -367,8 +547,9 @@ export default function Dashboard() {
              Eventos ({events.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('guests')}
-            className={`px-4 py-3 font-medium transition ${
+            className={`rounded-t-xl px-4 py-3 text-sm font-medium transition ${
               activeTab === 'guests'
                 ? 'border-b-2 border-cyan-400 text-cyan-400'
                 : 'text-slate-400 hover:text-slate-200'
@@ -377,8 +558,9 @@ export default function Dashboard() {
             👥 Convidados ({guests.length})
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('tables')}
-            className={`px-4 py-3 font-medium transition ${
+            className={`rounded-t-xl px-4 py-3 text-sm font-medium transition ${
               activeTab === 'tables'
                 ? 'border-b-2 border-cyan-400 text-cyan-400'
                 : 'text-slate-400 hover:text-slate-200'
@@ -386,52 +568,62 @@ export default function Dashboard() {
           >
              Mesas ({tables.length})
           </button>
-        </div>
+        </div>}
 
         {/* Events Tab */}
-        {activeTab === 'events' && (
-          <div className="grid gap-8 lg:grid-cols-3">
+        {showEventsWorkspace && activeTab === 'events' && (
+          <div className="grid gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur">
-                <div className="border-b border-white/10 p-6">
-                  <h2 className="text-xl font-semibold">Seus Eventos</h2>
+              <div className="dashboard-panel overflow-hidden rounded-2xl">
+                <div className="border-b border-white/[0.08] p-5 sm:p-6">
+                  <p className="dashboard-label">Gestão</p>
+                  <h2 className="mt-1 text-xl font-semibold text-white">Seus eventos</h2>
                   <p className="mt-1 text-sm text-slate-400">Gerencie todos os seus eventos em um só lugar</p>
                 </div>
                 <div className="divide-y divide-white/10">
-                  {events.length === 0 ? (
+                  {visibleEvents.length === 0 ? (
                     <div className="p-8 text-center text-slate-400">
-                      <p className="text-sm">Nenhum evento criado ainda</p>
+                      <p className="text-sm">{events.length === 0 ? 'Nenhum evento criado ainda' : 'Nenhum evento corresponde à pesquisa'}</p>
                     </div>
                   ) : (
-                    events.map((event) => (
-                      <div key={event.id} className="flex items-center justify-between p-6 hover:bg-white/5 transition">
+                    visibleEvents.map((event) => (
+                      <div key={event.id} className="flex flex-col gap-4 p-5 transition hover:bg-white/[0.035] sm:flex-row sm:items-center sm:justify-between sm:p-6">
                         <div className="flex-1">
                           <h3 className="font-semibold text-white">{event.name}</h3>
                           <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-slate-400">
-                            <p> {event.location}</p>
+                            <p className="truncate"> {event.location}</p>
                             <p> {event.max_guests} convidados</p>
                             <p> {formatDate(event.date)}</p>
-                            <p> PIN: <span className="text-cyan-300 font-mono">{event.scanner_pin}</span></p>
                           </div>
                         </div>
-                        <div className="ml-4 flex flex-col gap-2">
+                        <div className="flex flex-wrap gap-2 sm:ml-4 sm:max-w-[240px] sm:justify-end">
                           <button
+                            type="button"
                             onClick={() => loadGuests(event.id)}
-                            className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/20"
+                            className="rounded-lg border border-cyan-400/20 bg-cyan-500/10 px-3 py-2 text-xs font-medium text-cyan-200 transition hover:bg-cyan-500/20"
                           >
                             Convidados
                           </button>
                           <button
+                            type="button"
                             onClick={() => loadTables(event.id)}
-                            className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-500/20"
+                            className="rounded-lg border border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200 transition hover:bg-amber-500/20"
                           >
                             Mesas
                           </button>
                           <button
+                            type="button"
                             onClick={() => handleEventDelete(event.id)}
-                            className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-4 py-2 text-sm font-medium text-rose-200 transition hover:bg-rose-500/20"
+                            className="rounded-lg border border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs font-medium text-rose-200 transition hover:bg-rose-500/20"
                           >
                             Eliminar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/events/${event.id}`)}
+                            className="rounded-lg bg-slate-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-slate-500"
+                          >
+                            Abrir dashboard
                           </button>
                         </div>
                       </div>
@@ -441,8 +633,10 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/5 backdrop-blur p-6">
-              <h3 className="text-lg font-semibold mb-4">Criar Evento</h3>
+            <div id="create-event-form" className="dashboard-panel rounded-2xl p-5 sm:p-6">
+              <p className="dashboard-label">Novo registo</p>
+              <h3 className="mt-1 text-lg font-semibold text-white">Criar evento</h3>
+              <p className="mt-1 mb-5 text-sm text-slate-500">Comece a organizar o seu próximo momento.</p>
               <form onSubmit={handleEventSubmit} className="space-y-4">
                 <label className="block">
                   <span className="text-xs font-medium text-slate-300">Nome do Evento</span>
@@ -510,6 +704,7 @@ export default function Dashboard() {
                     {events.map((event) => (
                       <button
                         key={event.id}
+                        type="button"
                         onClick={() => loadGuests(event.id)}
                         className="rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/20"
                       >
@@ -531,6 +726,7 @@ export default function Dashboard() {
                         </div>
                         <div className="flex gap-2">
                           <button
+                            type="button"
                             onClick={handleSendAllInvites}
                             disabled={sendingAll || guests.length === 0}
                             className="rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-40"
@@ -538,6 +734,7 @@ export default function Dashboard() {
                             {sendingAll ? 'A enviar...' : '📨 Enviar Todos'}
                           </button>
                           <button
+                            type="button"
                             onClick={handleExportPdf}
                             disabled={exportingPdf || guests.length === 0}
                             className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1.5 text-xs font-medium text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-40"
@@ -545,6 +742,7 @@ export default function Dashboard() {
                             {exportingPdf ? 'A exportar...' : '📄 Exportar PDF'}
                           </button>
                           <button
+                            type="button"
                             onClick={() => setSelectedEventId('')}
                             className="text-xs text-slate-400 hover:text-slate-200"
                           >
@@ -567,11 +765,12 @@ export default function Dashboard() {
                                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-400">
                                   {guest.email && <p> {guest.email}</p>}
                                   {guest.phone && <p>{guest.phone}</p>}
-                                  <p className="col-span-2">🔐 <span className="text-cyan-300 font-mono">Código: {guest.backup_code}</span></p>
+                                  <p className="col-span-2"> <span className="text-cyan-300 font-mono">Código: {guest.backup_code}</span></p>
                                 </div>
                               </div>
                               <div className="flex gap-2">
                                 <button
+                                  type="button"
                                   onClick={() => handleSendInvite(guest.id)}
                                   disabled={sendingGuestId === guest.id || !guest.email}
                                   className={`rounded-lg px-3 py-1 text-xs font-medium transition disabled:opacity-40 ${
@@ -590,6 +789,7 @@ export default function Dashboard() {
                                   )}
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleExportIndividualPdf(guest)}
                                   disabled={exportingGuestId === guest.id}
                                   className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-1 text-xs text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-40"
@@ -601,6 +801,7 @@ export default function Dashboard() {
                                   }
                                 </button>
                                 <button
+                                  type="button"
                                   onClick={() => handleGuestDelete(guest.id)}
                                   className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-200 transition hover:bg-rose-500/20"
                                 >
@@ -708,6 +909,7 @@ export default function Dashboard() {
                           <p className="mt-1 text-sm text-slate-400">{selectedEvent?.name}</p>
                         </div>
                         <button
+                          type="button"
                           onClick={() => setSelectedEventId('')}
                           className="text-xs text-slate-400 hover:text-slate-200"
                         >
@@ -736,12 +938,14 @@ export default function Dashboard() {
                                 </div>
                                 <div className="flex gap-2">
                                   <button
+                                    type="button"
                                     onClick={() => handleTableEdit(table)}
                                     className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-200 transition hover:bg-amber-500/20"
                                   >
                                     Editar
                                   </button>
                                   <button
+                                    type="button"
                                     onClick={() => handleTableDelete(table.id)}
                                     className="rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-1 text-xs text-rose-200 transition hover:bg-rose-500/20"
                                   >
@@ -763,6 +967,7 @@ export default function Dashboard() {
                                     <span key={g.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-800 text-xs text-slate-300">
                                       {g.name}
                                       <button
+                                        type="button"
                                         onClick={() => handleAssignTable(g.id, '')}
                                         className="ml-1 text-slate-500 hover:text-rose-400"
                                         title="Remover da mesa"
@@ -875,6 +1080,6 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

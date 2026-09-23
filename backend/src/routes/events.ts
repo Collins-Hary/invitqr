@@ -1,66 +1,65 @@
 import { Router } from 'express'
-import { authMiddleware } from '../middleware/auth.js'
 import { PrismaClient } from '@prisma/client'
+import { authMiddleware, AuthRequest } from '../middleware/auth'
+import bcrypt from 'bcrypt'
 
 const router = Router()
 const prisma = new PrismaClient()
 
-router.post('/', authMiddleware, async (req, res, next): Promise<any> => {
+// Aplicar o middleware de autenticação a todas as rotas de eventos
+router.use(authMiddleware)
+
+/**
+ * Rota para listar todos os eventos do utilizador autenticado.
+ */
+router.get('/', async (req: AuthRequest, res, next) => {
   try {
-    const body = (req.body ?? {}) as Record<string, unknown>
-    const user = (req as any).user
+    const events = await prisma.event.findMany({
+      where: { user_id: req.user!.id },
+      orderBy: { date: 'asc' }
+    })
+    res.json(events)
+  } catch (error) {
+    next(error)
+  }
+})
 
-    const name = typeof body.name === 'string' ? body.name.trim() : ''
-    const location = typeof body.location === 'string' ? body.location.trim() : ''
-    const maxGuests = typeof body.max_guests === 'number' ? body.max_guests : Number(body.max_guests)
-    const dateValue = body.date
-    const date = dateValue ? new Date(dateValue as string) : null
-
-    if (!name || !location || !date || !Number.isFinite(maxGuests) || maxGuests <= 0) {
-      return res.status(400).json({ error: 'name, location, date e max_guests são obrigatórios' })
-    }
-
-    if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now()) {
-      return res.status(400).json({ error: 'A data deve ser futura' })
-    }
+/**
+ * Rota para criar um novo evento.
+ */
+router.post('/', async (req: AuthRequest, res, next) => {
+  try {
+    const { name, date, location, max_guests } = req.body
+    const scanner_pin = String(Math.floor(1000 + Math.random() * 9000))
+    const salt = await bcrypt.genSalt(10)
+    const scanner_pin_hash = await bcrypt.hash(scanner_pin, salt)
 
     const event = await prisma.event.create({
       data: {
-        user_id: user.id,
         name,
+        date: new Date(date),
         location,
-        max_guests: maxGuests,
-        date,
-        scanner_pin: Math.random().toString(36).slice(-6).toUpperCase()
+        max_guests,
+        user_id: req.user!.id,
+        scanner_pin: scanner_pin_hash // Armazenamos o hash
       }
     })
 
-    return res.status(201).json(event)
+    // Retornamos o PIN original para ser exibido uma vez
+    res.status(201).json({ ...event, scanner_pin })
   } catch (error) {
     next(error)
   }
 })
 
-router.get('/', authMiddleware, async (req, res, next): Promise<any> => {
+/**
+ * Rota para obter um evento específico.
+ */
+router.get('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const user = (req as any).user
-    const events = await prisma.event.findMany({
-      where: { user_id: user.id },
-      orderBy: { date: 'asc' }
-    })
-
-    return res.json(events)
-  } catch (error) {
-    next(error)
-  }
-})
-
-router.get('/:id', authMiddleware, async (req, res, next): Promise<any> => {
-  try {
-    const user = (req as any).user
+    const { id } = req.params
     const event = await prisma.event.findFirst({
-      where: { id: req.params.id, user_id: user.id },
-      include: { guests: true, tables: true }
+      where: { id, user_id: req.user!.id }
     })
 
     if (!event) {
@@ -69,55 +68,145 @@ router.get('/:id', authMiddleware, async (req, res, next): Promise<any> => {
 
     return res.json(event)
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 
-router.patch('/:id', authMiddleware, async (req, res, next): Promise<any> => {
+/**
+ * Rota para editar um evento.
+ */
+router.patch('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const user = (req as any).user
-    const existing = await prisma.event.findFirst({ where: { id: req.params.id, user_id: user.id } })
+    const { id } = req.params
+    const { name, date, location, max_guests } = req.body
 
-    if (!existing) {
+    const event = await prisma.event.findFirst({
+      where: { id, user_id: req.user!.id }
+    })
+
+    if (!event) {
       return res.status(404).json({ error: 'Evento não encontrado' })
     }
 
-    const body = (req.body ?? {}) as Record<string, unknown>
     const data: Record<string, unknown> = {}
-
-    if (typeof body.name === 'string' && body.name.trim()) data.name = body.name.trim()
-    if (typeof body.location === 'string' && body.location.trim()) data.location = body.location.trim()
-
-    if (typeof body.max_guests === 'number' && body.max_guests > 0) data.max_guests = body.max_guests
-    if (body.date) {
-      const parsedDate = new Date(body.date as string)
-      if (!Number.isNaN(parsedDate.getTime())) data.date = parsedDate
+    if (typeof name === 'string' && name.trim()) data.name = name.trim()
+    if (typeof date === 'string' && date.trim()) data.date = new Date(date)
+    if (typeof location === 'string' && location.trim()) data.location = location.trim()
+    if (typeof max_guests !== 'undefined') {
+      const maxGuestsNumber = Number(max_guests)
+      if (Number.isFinite(maxGuestsNumber) && maxGuestsNumber > 0) {
+        data.max_guests = maxGuestsNumber
+      }
     }
 
-    const event = await prisma.event.update({
-      where: { id: req.params.id },
+    const updatedEvent = await prisma.event.update({
+      where: { id },
       data
     })
 
-    return res.json(event)
+    return res.json(updatedEvent)
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 
-router.delete('/:id', authMiddleware, async (req, res, next): Promise<any> => {
+/**
+ * Rota para eliminar um evento.
+ */
+router.delete('/:id', async (req: AuthRequest, res, next) => {
   try {
-    const user = (req as any).user
-    const existing = await prisma.event.findFirst({ where: { id: req.params.id, user_id: user.id } })
+    const { id } = req.params
+    const deleted = await prisma.event.deleteMany({
+      where: {
+        id,
+        user_id: req.user!.id
+      }
+    })
 
-    if (!existing) {
-      return res.status(404).json({ error: 'Evento não encontrado' })
+    if (deleted.count === 0) {
+      return res.status(404).json({ error: 'Evento não encontrado ou não pertence ao utilizador.' })
     }
 
-    await prisma.event.delete({ where: { id: req.params.id } })
-    return res.json({ success: true, message: 'Evento eliminado com sucesso' })
+    return res.status(204).send()
   } catch (error) {
-    next(error)
+    return next(error)
+  }
+})
+
+/**
+ * Rota para obter estatísticas de um evento.
+ */
+router.get('/:id/stats', async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = req.params
+    const eventId = id
+
+    const event = await prisma.event.findFirst({ where: { id: eventId, user_id: req.user!.id } })
+    if (!event) {
+      return res.status(404).json({ error: 'Evento não encontrado ou não pertence ao utilizador.' })
+    }
+
+    const totalGuests = await prisma.guest.count({ where: { event_id: eventId } })
+    const confirmed = await prisma.guest.count({ where: { event_id: eventId, rsvp_status: 'confirmed' } })
+    const declined = await prisma.guest.count({ where: { event_id: eventId, rsvp_status: 'declined' } })
+    const pending = await prisma.guest.count({ where: { event_id: eventId, rsvp_status: 'pending' } })
+    const checkedIn = await prisma.guest.count({ where: { event_id: eventId, checked_in: true } })
+
+    // Agrupar check-ins por hora
+    const arrivals = await prisma.guest.findMany({
+      where: { event_id: eventId, checked_in: true, checked_in_at: { not: null } },
+      select: { checked_in_at: true }
+    })
+
+    const arrivalsByHour: { [key: string]: number } = {}
+    arrivals.forEach(arrival => {
+      if (arrival.checked_in_at) {
+        const hour = new Date(arrival.checked_in_at).getHours()
+        const hourString = `${String(hour).padStart(2, '0')}:00`
+        arrivalsByHour[hourString] = (arrivalsByHour[hourString] || 0) + 1
+      }
+    })
+
+    const chartData = Object.entries(arrivalsByHour)
+      .map(([hour, count]) => ({ hour, count }))
+      .sort((a, b) => a.hour.localeCompare(b.hour))
+
+    return res.json({
+      totalGuests,
+      checkedIn,
+      rsvp: {
+        confirmed,
+        declined,
+        pending
+      },
+      // Adicionamos os dados para o gráfico
+      arrivalsByHour: chartData
+    })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+/**
+ * Rota para obter a lista de convidados que fizeram check-in.
+ */
+router.get('/:id/checkins', async (req: AuthRequest, res, next) => {
+  try {
+    const { id } = req.params
+    const event = await prisma.event.findFirst({ where: { id, user_id: req.user!.id } })
+
+    if (!event) {
+      return res.status(404).json({ error: 'Evento não encontrado ou não pertence ao utilizador.' })
+    }
+
+    const checkIns = await prisma.guest.findMany({
+      where: { event_id: id, checked_in: true },
+      orderBy: { checked_in_at: 'desc' },
+      select: { id: true, name: true, checked_in_at: true, table: { select: { name: true } } }
+    })
+    return res.json(checkIns)
+  } catch (error) {
+    return next(error)
   }
 })
 

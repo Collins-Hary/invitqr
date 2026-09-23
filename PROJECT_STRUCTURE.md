@@ -1,5 +1,9 @@
 # InvitQR Project Structure
-
+<!-- #### 6.2 Serviço de WhatsApp
+- [ ] Criar `services/whatsappService.ts`
+  - Integrar Twilio ou WhatsApp Business API
+  - Função `sendInviteWhatsApp(phone, inviteLink, backupCode)`
+  - Mensagem formatada com link do convite -->
 ```
 invitqr/
 ├── frontend/                    # React + TypeScript

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import QRCode from 'qrcode.react'
+import { QRCodeSVG } from 'qrcode.react'
+import { getInviteDetails, updateRsvp } from '../services/auth'
 
 type RsvpStatus = 'pending' | 'confirmed' | 'declined';
 
@@ -19,42 +20,27 @@ interface InviteData {
   table: { name: string } | null;
 }
 
-const getInviteDetails = async (qrToken: string): Promise<InviteData> => {
-  const response = await fetch(`/api/invite/${qrToken}`)
-  if (!response.ok) {
-    if (response.status === 404) {
-      throw new Error('Convite não encontrado ou inválido.')
-    }
-    throw new Error('Não foi possível carregar os detalhes do convite.')
-  }
-  return response.json()
-}
-
-const updateRsvp = async (qrToken: string, status: RsvpStatus) => {
-  const response = await fetch(`/api/invite/${qrToken}/rsvp`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status })
-  })
-  if (!response.ok) {
-    throw new Error('Ocorreu um erro ao atualizar a sua resposta.')
-  }
-  return response.json()
-}
-
 export default function InvitePage() {
-  const { qrToken } = useParams<{ qrToken: string }>()
+  const { qrToken } = useParams<{ qrToken?: string }>()
   const [inviteData, setInviteData] = useState<InviteData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [rsvpLoading, setRsvpLoading] = useState(false)
 
   useEffect(() => {
+    const fetchDetails = async (token: string) => {
+      try {
+        const data = await getInviteDetails(token)
+        setInviteData(data)
+      } catch (err: any) {
+        setError(err?.response?.data?.error || 'Não foi possível carregar os detalhes do convite.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
     if (qrToken) {
-      getInviteDetails(qrToken)
-        .then(setInviteData)
-        .catch((err: Error) => setError(err.message))
-        .finally(() => setLoading(false))
+      fetchDetails(qrToken)
     } else {
       setError('Token do convite não encontrado.')
       setLoading(false)
@@ -65,18 +51,18 @@ export default function InvitePage() {
     if (!qrToken) return
     setRsvpLoading(true)
     try {
-      const result = await updateRsvp(qrToken, status)
+      const result: { success: boolean; rsvp_status: RsvpStatus } = await updateRsvp(qrToken, status)
       if (result.success) {
-        setInviteData((prev: InviteData | null) => {
+        setInviteData((prev) => {
           if (!prev) return null
           return {
-            ...prev, // @ts-ignore
+            ...prev,
             guest: { ...prev.guest, rsvp_status: result.rsvp_status }
           }
         })
       }
     } catch (err: unknown) {
-      setError(err.message || 'Ocorreu um erro.')
+      setError(err instanceof Error ? err.message : 'Ocorreu um erro ao atualizar a sua resposta.')
     } finally {
       setRsvpLoading(false)
     }
@@ -125,7 +111,7 @@ export default function InvitePage() {
           <div className="flex flex-col items-center">
             <p className="mb-3 text-sm text-slate-400">Apresente na entrada</p>
             <div className="rounded-lg bg-white p-4">
-              <QRCode value={inviteUrl} size={160} />
+              <QRCodeSVG value={inviteUrl} size={160} />
             </div>
           </div>
 

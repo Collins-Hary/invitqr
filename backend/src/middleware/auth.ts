@@ -1,30 +1,24 @@
 import { Request, Response, NextFunction } from 'express'
-import { verifyToken } from '../services/authService.js'
-import { PrismaClient } from '@prisma/client'
+import jwt from 'jsonwebtoken'
 
-const prisma = new PrismaClient()
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_local_dev'
 
-export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Token não fornecido' })
+export interface AuthRequest extends Request {
+  user?: { id: string }
+}
+
+export const authMiddleware = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.split(' ')[1]
+
+  if (!token) {
+    return res.status(401).json({ error: 'Acesso negado. Nenhum token fornecido.' })
   }
 
-  const token = authHeader.replace('Bearer ', '').trim()
   try {
-    const payload = verifyToken(token)
-    const user = await prisma.user.findUnique({ where: { id: payload.userId } })
-    if (!user) {
-      return res.status(401).json({ error: 'Token inválido' })
-    }
-    ;(req as any).user = {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      createdAt: user.created_at
-    }
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string }
+    req.user = { id: decoded.userId }
     return next()
-  } catch (error: any) {
-    return res.status(401).json({ error: error.message || 'Token inválido' })
+  } catch (error) {
+    return res.status(401).json({ error: 'Token inválido.' })
   }
 }

@@ -1,13 +1,14 @@
-import { createContext, useContext, useState, useCallback, useMemo, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as api from '../services/auth'
+import api from '../services/api'
+import * as authService from '../services/auth'
 
 const AUTH_TOKEN_KEY = 'invitqr_token'
 const AUTH_USER_KEY = 'invitqr_user'
 
 const AuthContext = createContext<any>(null)
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY))
   const [user, setUser] = useState(() => {
@@ -17,14 +18,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (token) {
-      api.getApiClient().defaults.headers.common.Authorization = `Bearer ${token}`
+      api.defaults.headers.common.Authorization = `Bearer ${token}`
     } else {
-      delete api.getApiClient().defaults.headers.common.Authorization
+      delete api.defaults.headers.common.Authorization
     }
   }, [token])
 
-  const login = useCallback(async (email, password) => {
-    const data = await api.login({ email, password })
+  const login = useCallback(async (email: string, password: string) => {
+    const data = await authService.login({ email, password })
     localStorage.setItem(AUTH_TOKEN_KEY, data.token)
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user))
     setToken(data.token)
@@ -32,8 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return data
   }, [])
 
-  const register = useCallback(async (name, email, password) => {
-    const data = await api.register({ name, email, password })
+  const register = useCallback(async (name: string, email: string, password: string) => {
+    const data = await authService.register({ name, email, password })
     localStorage.setItem(AUTH_TOKEN_KEY, data.token)
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user))
     setToken(data.token)

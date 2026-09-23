@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcrypt'
+import { getIO } from '../socket'
 
 const router = Router()
 const prisma = new PrismaClient()
@@ -42,7 +43,7 @@ router.post('/login', async (req, res, next) => {
       }
     })
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 
@@ -85,16 +86,22 @@ router.post('/check-in', async (req, res, next) => {
 
     const updatedGuest = await prisma.guest.update({
       where: { id: guest.id },
-      data: { checked_in: true, checked_in_at: new Date() }
+      data: { checked_in: true, checked_in_at: new Date() },
+      include: { table: true }
     })
 
-    return res.json({
+    // Emitir evento de check-in em tempo real
+    const payload = { guest: { name: updatedGuest.name, table: updatedGuest.table?.name || 'N/A', checked_in_at: updatedGuest.checked_in_at } }
+    getIO().emit(`event:${updatedGuest.event_id}:check-in`, payload)
+
+
+    return res.status(200).json({
       status: 'success',
       message: 'Entrada validada com sucesso!',
-      guest: { name: updatedGuest.name, table: guest.table?.name || 'N/A' }
+      guest: { name: updatedGuest.name, table: updatedGuest.table?.name || 'N/A' }
     })
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 

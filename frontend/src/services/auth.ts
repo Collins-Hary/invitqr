@@ -123,3 +123,27 @@ export async function getGuest(eventId: string, guestId: string) {
   const res = await api.get(`/events/${eventId}/guests/${guestId}`)
   return res.data
 }
+
+// ─── Event Stats & Check-ins ──────────────────────────────────────────────────
+
+export async function getEventStats(eventId: string) {
+  const res = await api.get(`/events/${eventId}/stats`)
+  return res.data
+}
+
+export async function getEventCheckins(eventId: string) {
+  const res = await api.get(`/events/${eventId}/checkins`)
+  return res.data
+}
+
+// ─── Public Invite Page ───────────────────────────────────────────────────────
+
+export async function getInviteDetails(qrToken: string) {
+  const res = await api.get(`/invite/${qrToken}`)
+  return res.data
+}
+
+export async function updateRsvp(qrToken: string, status: 'pending' | 'confirmed' | 'declined') {
+  const res = await api.patch(`/invite/${qrToken}/rsvp`, { status })
+  return res.data
+}

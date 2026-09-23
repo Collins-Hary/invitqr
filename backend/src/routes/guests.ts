@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { authMiddleware } from '../middleware/auth.js'
 import { PrismaClient } from '@prisma/client'
-import { decryptData, encryptData, generateBackupCode } from '../services/qrService.js'
+import { encryptData, generateBackupCode } from '../services/qrService.js'
 import { sendInviteEmail } from '../services/emailService.js'
 import PDFDocument from 'pdfkit'
 import qr from 'qr-image'
@@ -287,9 +287,9 @@ router.get('/:eventId/guests/export/pdf', authMiddleware, async (req, res, next)
       }
     })
 
-    doc.end()
+    return doc.end()
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 
@@ -339,9 +339,9 @@ router.get('/:eventId/guests/:guestId/export/pdf', authMiddleware, async (req, r
     doc.moveDown(1)
     doc.fontSize(8).font('Helvetica-Oblique').text('Apresente o QR Code ou o código de backup na entrada do evento.', { align: 'center' })
 
-    doc.end()
+    return doc.end()
   } catch (error) {
-    next(error)
+    return next(error)
   }
 })
 

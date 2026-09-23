@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth.tsx'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const location = useLocation()
   const auth = useAuth()
 
   async function handleSubmit(e: React.FormEvent) {
@@ -15,7 +16,8 @@ export default function Login() {
     if (!email || !password) return setError('Preencha email e password')
     try {
       await auth.login(email, password)
-      navigate('/dashboard')
+      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname || '/dashboard'
+      navigate(destination, { replace: true })
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || 'Erro no login')
     }
@@ -44,7 +46,7 @@ export default function Login() {
           </label>
           <button className="mt-6 w-full rounded-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300" type="submit">Entrar</button>
           <div className="mt-4 text-center text-sm text-slate-400">
-            Ainda não tem conta? <a className="font-semibold text-cyan-300" href="/register">Criar conta</a>
+            Ainda não tem conta? <Link className="font-semibold text-cyan-300" to="/register">Criar conta</Link>
           </div>
         </form>
       </div>

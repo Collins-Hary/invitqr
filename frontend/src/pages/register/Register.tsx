@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth.tsx'
 
 export default function Register() {
   const [name, setName] = useState('')
@@ -54,7 +54,7 @@ export default function Register() {
           </label>
           <button className="mt-6 w-full rounded-full bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:bg-cyan-300" type="submit">Criar conta</button>
           <div className="mt-4 text-center text-sm text-slate-400">
-            Já tem conta? <a className="font-semibold text-cyan-300" href="/login">Entrar</a>
+            Já tem conta? <Link className="font-semibold text-cyan-300" to="/login">Entrar</Link>
           </div>
         </form>
       </div>

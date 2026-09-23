@@ -1,29 +1,16 @@
-import { verifyToken } from '../services/authService.js';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-export async function authMiddleware(req, res, next) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Token não fornecido' });
+import jwt from 'jsonwebtoken';
+export const authMiddleware = (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ error: 'Acesso negado. Nenhum token fornecido.' });
     }
-    const token = authHeader.replace('Bearer ', '').trim();
     try {
-        const payload = verifyToken(token);
-        const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-        if (!user) {
-            return res.status(401).json({ error: 'Token inválido' });
-        }
-        ;
-        req.user = {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            createdAt: user.created_at
-        };
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        req.user = { id: decoded.userId };
         return next();
     }
     catch (error) {
-        return res.status(401).json({ error: error.message || 'Token inválido' });
+        return res.status(401).json({ error: 'Token inválido.' });
     }
-}
+};
 //# sourceMappingURL=auth.js.map
