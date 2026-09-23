@@ -31,6 +31,7 @@ model Event {
   date      DateTime
   location  String
   max_guests Int
+  theme     String     @default("midnight")
   scanner_pin String?
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt

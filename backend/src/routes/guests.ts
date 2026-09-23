@@ -9,6 +9,29 @@ import qr from 'qr-image'
 const router = Router()
 const prisma = new PrismaClient()
 
+function drawInvitePdf(doc: PDFKit.PDFDocument, event: { name: string; date: Date; location: string; theme?: string | null }, guest: { name: string; backup_code: string }, qrPng: string | Buffer) {
+  const palette = event.theme === 'garden'
+    ? { background: '#e7f1ec', ink: '#173b38', accent: '#16806d', soft: '#d4ebe0' }
+    : event.theme === 'editorial'
+      ? { background: '#edf2f5', ink: '#172b3a', accent: '#24749b', soft: '#d8e8ef' }
+      : { background: '#081525', ink: '#e8f7ff', accent: '#22d3ee', soft: '#12324a' }
+
+  doc.rect(0, 0, doc.page.width, doc.page.height).fill(palette.background)
+  doc.roundedRect(42, 42, doc.page.width - 84, doc.page.height - 84, 18).lineWidth(1).stroke(palette.accent)
+  doc.fillColor(palette.accent).fontSize(9).font('Helvetica-Bold').text('INVITQR  ·  CONVITE PESSOAL', 70, 74, { align: 'center', width: doc.page.width - 140, characterSpacing: 2 })
+  doc.fillColor(palette.ink).fontSize(28).font('Helvetica-Bold').text(event.name, 70, 112, { align: 'center', width: doc.page.width - 140 })
+  doc.fillColor(palette.accent).fontSize(12).font('Helvetica').text('Você é nosso convidado especial', 70, 154, { align: 'center', width: doc.page.width - 140 })
+  doc.fillColor(palette.ink).fontSize(18).font('Helvetica-Bold').text(guest.name, 70, 190, { align: 'center', width: doc.page.width - 140 })
+  doc.fillColor(palette.ink).fontSize(11).font('Helvetica').text(`${new Date(event.date).toLocaleString('pt-PT')}  ·  ${event.location}`, 70, 222, { align: 'center', width: doc.page.width - 140 })
+  doc.roundedRect(155, 260, 282, 282, 14).fill(palette.soft)
+  doc.image(qrPng, 186, 291, { fit: [220, 220] })
+  doc.fillColor(palette.ink).fontSize(10).font('Helvetica').text('Apresente este QR Code na entrada', 70, 565, { align: 'center', width: doc.page.width - 140 })
+  doc.roundedRect(155, 602, 282, 66, 12).lineWidth(1).stroke(palette.accent)
+  doc.fillColor(palette.accent).fontSize(9).font('Helvetica').text('CÓDIGO DE BACKUP', 70, 615, { align: 'center', width: doc.page.width - 140 })
+  doc.fillColor(palette.ink).fontSize(22).font('Helvetica-Bold').text(guest.backup_code, 70, 633, { align: 'center', width: doc.page.width - 140, characterSpacing: 3 })
+  doc.fillColor(palette.ink).fontSize(8).font('Helvetica-Oblique').text('Guarde este convite e apresente-o no momento da chegada.', 70, 704, { align: 'center', width: doc.page.width - 140 })
+}
+
 router.post('/:eventId/guests', authMiddleware, async (req, res, next): Promise<any> => {
   try {
     const user = (req as any).user
@@ -258,29 +281,7 @@ router.get('/:eventId/guests/export/pdf', authMiddleware, async (req, res, next)
       const inviteLink = `${baseUrl}/invite/${guest.qr_token}`
       const qr_png = qr.imageSync(inviteLink, { type: 'png' })
 
-      // Título do Evento
-      doc.fontSize(24).font('Helvetica-Bold').text(event.name, { align: 'center' })
-      doc.fontSize(12).font('Helvetica').text(new Date(event.date).toLocaleString('pt-PT'), { align: 'center' })
-      doc.moveDown(2)
-
-      // Nome do Convidado
-      doc.fontSize(20).font('Helvetica-Bold').text(guest.name, { align: 'center' })
-      doc.moveDown(2)
-
-      // QR Code
-      doc.image(qr_png, {
-        fit: [200, 200],
-        align: 'center',
-        valign: 'center'
-      })
-      doc.moveDown(2)
-
-      // Código de Backup
-      doc.fontSize(12).font('Helvetica').text('Código de Backup:', { align: 'center' })
-      doc.fontSize(22).font('Helvetica-Bold').text(guest.backup_code, { align: 'center' })
-
-      doc.moveDown(1)
-      doc.fontSize(8).font('Helvetica-Oblique').text('Apresente o QR Code ou o código de backup na entrada do evento.', { align: 'center' })
+      drawInvitePdf(doc, event, guest, qr_png)
 
       if (index < guests.length - 1) {
         doc.addPage()
@@ -319,25 +320,7 @@ router.get('/:eventId/guests/:guestId/export/pdf', authMiddleware, async (req, r
     const inviteLink = `${baseUrl}/invite/${guest.qr_token}`
     const qr_png = qr.imageSync(inviteLink, { type: 'png' })
 
-    // Título do Evento
-    doc.fontSize(24).font('Helvetica-Bold').text(event.name, { align: 'center' })
-    doc.fontSize(12).font('Helvetica').text(new Date(event.date).toLocaleString('pt-PT'), { align: 'center' })
-    doc.moveDown(2)
-
-    // Nome do Convidado
-    doc.fontSize(20).font('Helvetica-Bold').text(guest.name, { align: 'center' })
-    doc.moveDown(2)
-
-    // QR Code
-    doc.image(qr_png, { fit: [200, 200], align: 'center', valign: 'center' })
-    doc.moveDown(2)
-
-    // Código de Backup
-    doc.fontSize(12).font('Helvetica').text('Código de Backup:', { align: 'center' })
-    doc.fontSize(22).font('Helvetica-Bold').text(guest.backup_code, { align: 'center' })
-
-    doc.moveDown(1)
-    doc.fontSize(8).font('Helvetica-Oblique').text('Apresente o QR Code ou o código de backup na entrada do evento.', { align: 'center' })
+    drawInvitePdf(doc, event, guest, qr_png)
 
     return doc.end()
   } catch (error) {

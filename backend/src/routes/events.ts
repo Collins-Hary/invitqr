@@ -29,7 +29,7 @@ router.get('/', async (req: AuthRequest, res, next) => {
  */
 router.post('/', async (req: AuthRequest, res, next) => {
   try {
-    const { name, date, location, max_guests } = req.body
+    const { name, date, location, max_guests, theme } = req.body
     const scanner_pin = String(Math.floor(1000 + Math.random() * 9000))
     const salt = await bcrypt.genSalt(10)
     const scanner_pin_hash = await bcrypt.hash(scanner_pin, salt)
@@ -40,6 +40,7 @@ router.post('/', async (req: AuthRequest, res, next) => {
         date: new Date(date),
         location,
         max_guests,
+        theme: typeof theme === 'string' ? theme : 'midnight',
         user_id: req.user!.id,
         scanner_pin: scanner_pin_hash // Armazenamos o hash
       }
@@ -78,7 +79,7 @@ router.get('/:id', async (req: AuthRequest, res, next) => {
 router.patch('/:id', async (req: AuthRequest, res, next) => {
   try {
     const { id } = req.params
-    const { name, date, location, max_guests } = req.body
+    const { name, date, location, max_guests, theme } = req.body
 
     const event = await prisma.event.findFirst({
       where: { id, user_id: req.user!.id }
@@ -97,6 +98,7 @@ router.patch('/:id', async (req: AuthRequest, res, next) => {
       if (Number.isFinite(maxGuestsNumber) && maxGuestsNumber > 0) {
         data.max_guests = maxGuestsNumber
       }
+      if (typeof theme === 'string' && ['midnight', 'editorial', 'garden'].includes(theme)) data.theme = theme
     }
 
     const updatedEvent = await prisma.event.update({

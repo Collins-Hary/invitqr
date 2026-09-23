@@ -23,7 +23,7 @@ export default function Dashboard() {
   const [selectedEvent, setSelectedEvent] = useState<any>(null)
   const [guests, setGuests] = useState<any[]>([])
   const [tables, setTables] = useState<any[]>([])
-  const [eventForm, setEventForm] = useState({ name: '', date: '', location: '', max_guests: '100' })
+  const [eventForm, setEventForm] = useState({ name: '', date: '', location: '', max_guests: '100', theme: 'midnight' })
   const [guestForm, setGuestForm] = useState({ name: '', email: '', phone: '' })
   const [tableForm, setTableForm] = useState({ name: '', capacity: '8' })
   const [editTableId, setEditTableId] = useState<string | null>(null)
@@ -75,21 +75,6 @@ export default function Dashboard() {
     auth.logout()
   }
 
-  const handleShareEvent = async (event: any) => {
-    const shareUrl = `${window.location.origin}/invite/${event?.qr_token || event?.id}`
-
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(shareUrl)
-        setSuccess('Link do convite copiado para a área de transferência!')
-      } else {
-        window.open(shareUrl, '_blank', 'noopener,noreferrer')
-      }
-    } catch {
-      window.open(shareUrl, '_blank', 'noopener,noreferrer')
-    }
-  }
-
   const handleEventSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -101,9 +86,10 @@ export default function Dashboard() {
         name: eventForm.name,
         date: eventForm.date,
         location: eventForm.location,
-        max_guests: Number(eventForm.max_guests)
+        max_guests: Number(eventForm.max_guests),
+        theme: eventForm.theme as 'midnight' | 'editorial' | 'garden'
       })
-      setEventForm({ name: '', date: '', location: '', max_guests: '100' })
+      setEventForm({ name: '', date: '', location: '', max_guests: '100', theme: 'midnight' })
       setSuccess('Evento criado! Anote o PIN do Scanner, ele não será mostrado novamente.')
       setLastCreatedPin(newEvent.scanner_pin) // Guardar o PIN para exibir no modal
       await loadEvents()
@@ -514,7 +500,7 @@ export default function Dashboard() {
               </div>
               <span className="text-xs text-slate-500">{events.length} no total</span>
             </div>
-            <RecentInvites events={events} onShare={handleShareEvent} />
+            <RecentInvites events={events} />
           </section>
           <div className="space-y-6">
             <QuickActions onCreated={(event) => {
@@ -649,6 +635,27 @@ export default function Dashboard() {
                     required
                   />
                 </label>
+                <fieldset>
+                  <legend className="text-xs font-medium text-slate-300">Modelo do convite</legend>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                    {[
+                      { id: 'midnight', name: 'Midnight', description: 'Noturno e elegante', swatch: 'from-slate-950 to-cyan-700' },
+                      { id: 'editorial', name: 'Editorial', description: 'Minimalista e clássico', swatch: 'from-stone-100 to-sky-200' },
+                      { id: 'garden', name: 'Garden', description: 'Leve e natural', swatch: 'from-emerald-100 to-cyan-300' }
+                    ].map((model) => (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => setEventForm({ ...eventForm, theme: model.id })}
+                        className={`rounded-xl border p-3 text-left transition ${eventForm.theme === model.id ? 'border-cyan-300 bg-cyan-400/10 ring-1 ring-cyan-300/40' : 'border-white/10 bg-slate-900/50 hover:border-white/25'}`}
+                      >
+                        <span className={`mb-2 block h-10 rounded-lg bg-gradient-to-br ${model.swatch}`} />
+                        <span className="block text-xs font-semibold text-white">{model.name}</span>
+                        <span className="mt-1 block text-[11px] text-slate-500">{model.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
                 <label className="block">
                   <span className="text-xs font-medium text-slate-300">Data e Hora</span>
                   <input
@@ -769,6 +776,14 @@ export default function Dashboard() {
                                 </div>
                               </div>
                               <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => window.open(`${window.location.origin}/invite/${guest.qr_token}`, '_blank', 'noopener,noreferrer')}
+                                  className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs text-cyan-200 transition hover:bg-cyan-400/20"
+                                  title="Abrir convite estilizado"
+                                >
+                                  Ver convite
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => handleSendInvite(guest.id)}

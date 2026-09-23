@@ -28,6 +28,7 @@ export interface EventPayload {
   date: string
   location: string
   max_guests: number
+  theme?: 'midnight' | 'editorial' | 'garden'
 }
 
 export async function listEvents() {

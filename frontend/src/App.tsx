@@ -6,6 +6,7 @@ import LandingPage from './pages/landing/LandingPage'
 import PrivateRoute from './components/PrivateRoute'
 import ScannerPage from './pages/scanner/ScannerPage'
 import EventPage from './pages/dashboard/EventPage'
+import InvitePage from './invite/InvitePage'
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
       <Route path='/stats' element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path='/settings' element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path='/scanner' element={<ScannerPage />} />
+      <Route path='/invite/:qrToken' element={<InvitePage />} />
       <Route path='*' element={<Navigate to='/' replace />} />
     </Routes>
   )

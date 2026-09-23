@@ -20,7 +20,7 @@ router.get('/:qrToken', async (req, res, next) => {
 
     return res.json({
       guest: { name: guest.name, rsvp_status: guest.rsvp_status, backup_code: guest.backup_code, qr_token: guest.qr_token },
-      event: { name: guest.event.name, date: guest.event.date, location: guest.event.location },
+      event: { name: guest.event.name, date: guest.event.date, location: guest.event.location, theme: guest.event.theme || 'midnight' },
       table: guest.table ? { name: guest.table.name } : null
     })
   } catch (error) {

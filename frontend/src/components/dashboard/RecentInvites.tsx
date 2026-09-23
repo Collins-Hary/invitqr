@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-export default function RecentInvites({ events = [], onShare }: { events?: any[]; onShare?: (event: any) => void }) {
+export default function RecentInvites({ events = [] }: { events?: any[] }) {
   if (!events || events.length === 0) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-6 text-center text-slate-400">Ainda não criou nenhum convite.</div>
@@ -20,7 +20,7 @@ export default function RecentInvites({ events = [], onShare }: { events?: any[]
           </div>
           <div className="ml-3 flex items-center gap-2">
             <Link to={`/events/${ev.id}`} className="rounded-lg bg-white/[0.06] px-3 py-2 text-xs text-slate-300 transition hover:bg-white/10">Abrir</Link>
-            <button type="button" aria-label={`Partilhar ${ev.name}`} onClick={() => onShare ? onShare(ev) : window.open(`${window.location.origin}/invite/${ev.id}`, '_blank', 'noopener,noreferrer')} className="rounded-lg bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200 transition hover:bg-cyan-400/20">Partilhar</button>
+            <button type="button" aria-label={`Gerir convidados de ${ev.name}`} onClick={() => window.location.href = `/guests?event=${ev.id}`} className="rounded-lg bg-cyan-400/10 px-3 py-2 text-xs text-cyan-200 transition hover:bg-cyan-400/20">Convidados</button>
           </div>
         </div>
       ))}
